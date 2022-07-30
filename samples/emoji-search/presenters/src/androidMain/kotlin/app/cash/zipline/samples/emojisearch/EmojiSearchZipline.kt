@@ -15,20 +15,24 @@
  */
 package app.cash.zipline.samples.emojisearch
 
+import android.content.Context
 import app.cash.zipline.Zipline
 import app.cash.zipline.loader.ZiplineLoader
 import java.util.concurrent.Executors
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
-class EmojiSearchZipline {
+class EmojiSearchZipline(context: Context) {
   private val executorService = Executors.newSingleThreadExecutor { Thread(it, "Zipline") }
   private val dispatcher = executorService.asCoroutineDispatcher()
   private val client = OkHttpClient()
@@ -38,6 +42,7 @@ class EmojiSearchZipline {
   private val moduleName = "./zipline-root-presenters.js"
 
   private val ziplineLoader = ZiplineLoader(
+    context = context,
     dispatcher = dispatcher,
     httpClient = client,
   )
@@ -55,10 +60,16 @@ class EmojiSearchZipline {
       }
       this@EmojiSearchZipline.zipline = zipline
       val presenter = zipline.take<EmojiSearchPresenter>("emojiSearchPresenter")
+      val stateFlow = MutableStateFlow(EmojiSearchViewModel("", listOf()))
 
-      val modelsFlow = presenter.produceModels(eventFlow)
+      launch {
+        eventFlow.collect {
+          val produceModel = presenter.produceModels()
+          stateFlow.value = produceModel
+        }
+      }
 
-      modelsStateFlow.emitAll(modelsFlow)
+      modelsStateFlow.emitAll(stateFlow)
 
       coroutineContext.job.invokeOnCompletion {
         dispatcher.dispatch(EmptyCoroutineContext) { zipline.close() }

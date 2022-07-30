@@ -2,11 +2,12 @@ import org.jetbrains.kotlin.gradle.plugin.PLUGIN_CLASSPATH_CONFIGURATION_NAME
 
 plugins {
   kotlin("multiplatform")
+  id("com.android.library")
   kotlin("plugin.serialization")
 }
 
 kotlin {
-  jvm()
+  android()
 
   js {
     browser()
@@ -19,7 +20,7 @@ kotlin {
         implementation(projects.zipline)
       }
     }
-    val jvmMain by getting {
+    val androidMain by getting {
       dependencies {
         implementation(libs.okHttp.core)
         implementation(libs.sqldelight.driver.android)
@@ -52,4 +53,23 @@ val compileZipline by tasks.creating(JavaExec::class) {
 
 val jsBrowserProductionRun by tasks.getting {
   dependsOn(compileZipline)
+}
+
+android {
+  compileSdkVersion(libs.versions.compileSdk.get().toInt())
+
+  defaultConfig {
+    minSdkVersion(18)
+    multiDexEnabled = true
+    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+  }
+
+  sourceSets {
+    getByName("main") {
+      manifest.srcFile("src/androidMain/AndroidManifest.xml")
+    }
+    getByName("androidTest") {
+      java.srcDirs("src/androidTest/kotlin/")
+    }
+  }
 }
